@@ -2,9 +2,12 @@ import sys
 import os
 import argparse
 import glob
+from typing import Dict
+
 from mp3_tagger import MP3File, VERSION_1, VERSION_2, VERSION_BOTH, MP3OpenFileError
-from utils import Utils
+import utils
 import json
+
 
 def arg_parsing():
     parser = argparse.ArgumentParser(description='Process some integers.')
@@ -34,16 +37,17 @@ def read_dirs(path, is_recursive):
 
 def clean(file):
     clean_result = {}
-    tag_datas = {"artist": "", "song": "", "year": "", "album": ""}
+    tag_datas : Dict[str,str] = {"artist": "", "song": "", "year": "", "album": ""}
 
     try:
-        mp3_file = MP3File(file)
+        mp3_file: MP3File = MP3File(file)
     except MP3OpenFileError as file_e:
         clean_result["STATUS"] = "ERROR"
         clean_result["FILE"] = file
         clean_result["MSG"] = "open error"
         return clean_result
 
+    tags = None
     try:
         tags = mp3_file.get_tags()
     except Exception as e:
@@ -52,7 +56,13 @@ def clean(file):
         clean_result["MSG"] = "get_tag_error"
         return clean_result
 
-    v2_tag = Utils.get_v(tags, "ID3TagV2")
+    if tags is None:
+        clean_result["STATUS"] = "ERROR"
+        clean_result["FILE"] = file
+        clean_result["MSG"] = "tags is None"
+        return clean_result
+
+    v2_tag = utils.get_v(tags, "ID3TagV2")
     if v2_tag is None:
         clean_result["STATUS"] = "ERROR"
         clean_result["FILE"] = file
@@ -60,7 +70,7 @@ def clean(file):
         return clean_result
 
     for k in tag_datas:
-        tag_value = Utils.get_v(v2_tag, k)
+        tag_value = utils.get_v(v2_tag, k)
         if tag_value is None:
             tag_value = ""
 
@@ -75,7 +85,6 @@ def clean(file):
 
 if __name__ == "__main__":
     input_args = arg_parsing()
-    print(input_args)
 
     src_path = input_args.src_path
     check_flag = check_src_path(src_path)
@@ -99,7 +108,7 @@ if __name__ == "__main__":
     write_file = open(output_file, "w", encoding="utf-8")
     i = 0
     for src_file in src_files:
-        if src_file.endswith(".MP3"):
+        if src_file.endswith(".MP3") or src_file.find(" "):
             to_rename_file = src_file[0:-4] + ".mp3"
             os.renames(src_file, to_rename_file)
             src_file = to_rename_file
@@ -107,9 +116,9 @@ if __name__ == "__main__":
         write_file.write(json.dumps(clean(src_file), ensure_ascii=False) + "\n")
         if i >= 100:
             print("process_cnt={0}".format(i))
-            i=0
+            i = 0
         else:
-            i=i+1
+            i = i + 1
 
     write_file.flush()
     write_file.close()
