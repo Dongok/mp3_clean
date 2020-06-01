@@ -2,12 +2,23 @@ import sys
 import os
 import argparse
 import glob
-from typing import Dict
+from typing import Dict, List
 
 from mp3_tagger import MP3File, VERSION_1, VERSION_2, VERSION_BOTH, MP3OpenFileError
 import utils
 import json
 
+
+def check_chars(org_str):
+    byte_org_str = org_str.encode("utf-8")
+    replace_bytes : bytes = b''
+
+    for b_index in range(0, len(byte_org_str)):
+        b_str = byte_org_str[b_index:b_index+1]
+        if b_str != b"\x00":
+            replace_bytes += b_str
+
+    return str(replace_bytes.decode("utf-8"))
 
 def arg_parsing():
     parser = argparse.ArgumentParser(description='Process some integers.')
@@ -107,18 +118,32 @@ if __name__ == "__main__":
 
     write_file = open(output_file, "w", encoding="utf-8")
     i = 0
+    artists={}
     for src_file in src_files:
         if src_file.endswith(".MP3") or src_file.find(" "):
             to_rename_file = src_file[0:-4] + ".mp3"
             os.renames(src_file, to_rename_file)
             src_file = to_rename_file
 
-        write_file.write(json.dumps(clean(src_file), ensure_ascii=False) + "\n")
+        clean_meta = clean(src_file)
+        artist = utils.get_v(clean_meta["DATA"], "artist")
+        if artist is None:
+            artist = ""
+
+        artist = check_chars(artist)
+
+        write_file.write(json.dumps(clean_meta, ensure_ascii=False) + "\n")
+        artists[artist] = artist
+        sorted(artists)
         if i >= 100:
             print("process_cnt={0}".format(i))
             i = 0
         else:
             i = i + 1
 
+    for artist in artists:
+        print(artist)
+
+    write_file.write(json.dumps(artists,ensure_ascii=False)+"\n")
     write_file.flush()
     write_file.close()
