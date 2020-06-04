@@ -3,6 +3,7 @@ import os
 import argparse
 import glob
 from typing import Dict, List
+import logging
 
 from mp3_tagger import MP3File, VERSION_1, VERSION_2, VERSION_BOTH, MP3OpenFileError
 import utils
@@ -120,15 +121,20 @@ if __name__ == "__main__":
     i = 0
     artists={}
     for src_file in src_files:
-        if src_file.endswith(".MP3") or src_file.find(" "):
+        if src_file.endswith(".MP3") or ( src_file.find(" ") > -1 ):
             to_rename_file = src_file[0:-4] + ".mp3"
+            to_rename_file = to_rename_file.replace(" ","_")
             os.renames(src_file, to_rename_file)
             src_file = to_rename_file
 
         clean_meta = clean(src_file)
-        artist = utils.get_v(clean_meta["DATA"], "artist")
-        if artist is None:
-            artist = ""
+        artist=""
+        try:
+            artist = utils.get_v(clean_meta["DATA"], "artist")
+            if artist is None:
+                artist = ""
+        except KeyError as E:
+            print(clean_meta)
 
         artist = check_chars(artist)
 
@@ -141,9 +147,13 @@ if __name__ == "__main__":
         else:
             i = i + 1
 
-    for artist in artists:
-        print(artist)
-
-    write_file.write(json.dumps(artists,ensure_ascii=False)+"\n")
     write_file.flush()
     write_file.close()
+
+    artist_file = "{0}/artist_list.out".format(os.path.abspath("."))
+    artist_out_f = open(artist_file, mode="a")
+    for k, v in artists.items():
+        artist_out_f.write("{0}\t{1}\n".format(k,v))
+
+    artist_out_f.flush()
+    artist_out_f.close()
